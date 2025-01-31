@@ -301,6 +301,7 @@ class PorcelainFormatter(DefaultFormatter):
             return None
 
     def parse_datetime(self, value):
+        # FIXME(skowalak): problem when value is not an int.
         if value:
             return datetime.fromtimestamp(value, tz=pytz.UTC)
         else:

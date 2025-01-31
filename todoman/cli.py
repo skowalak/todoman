@@ -356,37 +356,64 @@ with contextlib.suppress(ImportError):
     default=False,
     help="Read task description from stdin.",
 )
-# TODO(skowalak): Generalize JSON option
-@click.option(
-    "--read-json",
-    "-j",
-    is_flag=True,
-    default=False,
-    help="Read a task representation in JSON format from stdin.",
-)
 @_todo_property_options
 @_interactive_option
 @pass_ctx
 @catch_errors
-def new(ctx, summary, list, read_json, todo_properties, read_description, interactive):
+def new(ctx, summary, list, todo_properties, read_description, interactive):
     """
     Create a new task with SUMMARY.
     """
 
-    # if read-json is enabled, ignore all other options and parse stdin
-    if read_json:
-        parser = parsers.JsonParser(list_=list, new=True, ctx=ctx)
-        todos = parser.parse("".join(sys.stdin))
-    else:
-        parser = parsers.DefaultParser(list_=list, new=True, ctx=ctx)
-        if read_description:
-            todo_properties["description"] = "".join(sys.stdin)
+    parser = parsers.DefaultParser(list_=list, new=True, ctx=ctx)
+    if read_description:
+        todo_properties["description"] = "".join(sys.stdin)
 
-        todo_properties["summary"] = " ".join(summary)
+    todo_properties["summary"] = " ".join(summary)
 
-        # this will always return a list with only one element
-        todos = parser.parse(todo_properties)
+    # this will always return a list with only one element
+    todos = parser.parse(todo_properties)
 
+    for todo in todos:
+        if interactive or (not summary and interactive is None):
+            ui = TodoEditor(todo, ctx.db.lists(), ctx.ui_formatter)
+            ui.edit()
+            click.echo()  # work around lines going missing after urwid
+
+        if not todo.summary:
+            raise click.UsageError("No SUMMARY specified")
+
+        ctx.db.save(todo)
+        click.echo(ctx.formatter.detailed(todo))
+
+
+
+@cli.command("new-json")
+@click.option(
+    "--list",
+    "-l",
+    callback=_validate_list_param,
+    help="List in which the task will be saved.",
+)
+@click.option(
+    "--read-json",
+    "-j",
+    is_flag=True,
+    default=True,
+    help="Read a task representation in JSON format from stdin.",
+)
+@pass_ctx
+@click.pass_context
+@catch_errors
+def new_json(ctx, list, read_json):
+    """
+    Create a new todo from JSON.
+    """
+    if not read_json:
+        raise click.BadParameter("read_json must be set")
+
+    parser = parsers.JsonParser(list_=list, new=True, ctx=ctx)
+    todos = parser.parse("".join(sys.stdin))
     for todo in todos:
         if interactive or (not summary and interactive is None):
             ui = TodoEditor(todo, ctx.db.lists(), ctx.ui_formatter)

@@ -1,0 +1,5 @@
+* fix porcelain parse input datetime formatters.py:288
+* tests:
+  * new/edit with porcelain
+  * new/edit without porcelain
+* 
